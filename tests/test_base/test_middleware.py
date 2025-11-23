@@ -18,7 +18,8 @@ class TestUnfazedTaskiqExceptionMiddleware:
 
     def setup_method(self) -> None:
         """Set up test fixtures before each test method."""
-        self.middleware = UnfazedTaskiqExceptionMiddleware()
+        with patch("unfazed_taskiq.middleware.agent.setup"):
+            self.middleware = UnfazedTaskiqExceptionMiddleware()
         self.mock_message = MagicMock(spec=TaskiqMessage)
         self.mock_message.task_name = "test_task"
         self.mock_message.args = ("arg1", "arg2")
