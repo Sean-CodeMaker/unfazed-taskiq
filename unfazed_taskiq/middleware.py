@@ -4,14 +4,15 @@ from typing import Any
 from taskiq import TaskiqMessage, TaskiqResult
 from taskiq.abc.middleware import TaskiqMiddleware
 from unfazed_sentry import capture_exception
-from unfazed_sentry.base import agent
+from unfazed_sentry.base import agent as sentry_agent
 from unfazed_taskiq.logger import log
 
 
 class UnfazedTaskiqExceptionMiddleware(TaskiqMiddleware):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        agent.setup()
+        if not sentry_agent.scope_handlers:
+            sentry_agent.setup()
 
     async def on_error(
         self,
