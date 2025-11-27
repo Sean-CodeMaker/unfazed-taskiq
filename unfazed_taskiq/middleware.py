@@ -5,6 +5,7 @@ from taskiq import TaskiqMessage, TaskiqResult
 from taskiq.abc.middleware import TaskiqMiddleware
 from unfazed_sentry import capture_exception
 from unfazed_sentry.base import agent as sentry_agent
+
 from unfazed_taskiq.logger import log
 
 

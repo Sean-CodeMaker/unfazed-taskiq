@@ -172,6 +172,8 @@ class TortoiseScheduleSource(ScheduleSource):
         if task.cron is None and task.time is not None:
             enabled = 0
 
-        await m.PeriodicTask.filter(schedule_id=task.schedule_id).using_db(
-            self.alias
-        ).update(total_run_count=F("total_run_count") + 1, enabled=enabled)
+        await (
+            m.PeriodicTask.filter(schedule_id=task.schedule_id)
+            .using_db(self.alias)
+            .update(total_run_count=F("total_run_count") + 1, enabled=enabled)
+        )
