@@ -94,13 +94,18 @@ class PeriodicTask(BaseModel):
     )
 
     def to_taskiq_schedule_task(self) -> ScheduledTask:
-        base_data = {
-            "task_name": self.task_name,
-            "args": json.loads(self.task_args.encode()),
-            "kwargs": json.loads(self.task_kwargs.encode()),
-            "labels": json.loads(self.labels.encode()),
-            "schedule_id": self.schedule_id,
-        }
+        try:
+            base_data = {
+                "task_name": self.task_name,
+                "args": json.loads(self.task_args.encode()),
+                "kwargs": json.loads(self.task_kwargs.encode()),
+                "labels": json.loads(self.labels.encode()),
+                "schedule_id": self.schedule_id,
+            }
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"Invalid JSON in task {self.schedule_id}: {e}"
+            ) from e
 
         if self.cron:
             base_data["cron"] = self.cron

@@ -105,6 +105,25 @@ class TestPeriodicTaskModel(object):
         with pytest.raises(RuntimeError, match="No schedule found"):
             periodic_task.to_taskiq_schedule_task()
 
+    async def test_periodic_task_model_to_taskiq_schedule_task_invalid_json_error(
+        self,
+    ) -> None:
+        """Test to_taskiq_schedule_task method raises RuntimeError when JSON is invalid."""
+        import pytest
+
+        # Create a PeriodicTask with invalid JSON in task_args
+        periodic_task = await PeriodicTask.create(
+            task_name="test.invalid_json_task",
+            task_args="{invalid_json}",  # Invalid JSON
+            task_kwargs="{}",
+            labels="{}",
+            cron="* * * * *",
+        )
+
+        # Test that RuntimeError is raised
+        with pytest.raises(RuntimeError, match="Invalid JSON in task"):
+            periodic_task.to_taskiq_schedule_task()
+
 
 class TestPeriodicTaskSerializer(object):
     async def test_periodic_task_serializer(
@@ -126,6 +145,7 @@ class TestPeriodicTaskSerializer(object):
             "task_kwargs": '{"key": "value"}',
             "task_args": '["arg1", "arg2"]',
             "labels": '{"label1": "value1"}',
+            "cron": "* * * * *",
         }
         # Use model_validate to trigger the validator
         serializer = PeriodicTaskSerializer.model_validate(valid_data)
@@ -141,6 +161,7 @@ class TestPeriodicTaskSerializer(object):
             "task_args": "[]",
             "task_kwargs": "{}",
             "labels": "{}",
+            "cron": "* * * * *",
         }
         # Use model_validate to trigger the validator - should not raise
         serializer = PeriodicTaskSerializer.model_validate(data_with_none_fields)
@@ -184,4 +205,19 @@ class TestPeriodicTaskSerializer(object):
             "labels": "{invalid}",
         }
         with pytest.raises(ValidationError, match="labels is not a valid JSON string"):
+            PeriodicTaskSerializer.model_validate(invalid_data)
+
+    async def test_validator_rejects_missing_cron_and_time(self) -> None:
+        """Test that validator rejects data without cron or time."""
+        import pytest
+        from pydantic import ValidationError
+
+        invalid_data = {
+            "task_name": "test.task",
+            "task_args": "[]",
+            "task_kwargs": "{}",
+            "labels": "{}",
+            # No cron or time provided
+        }
+        with pytest.raises(ValidationError, match="cron or time is required"):
             PeriodicTaskSerializer.model_validate(invalid_data)

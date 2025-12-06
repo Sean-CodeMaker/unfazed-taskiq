@@ -234,6 +234,17 @@ class TestAgentHandler:
         handler._ready = True
         assert handler.scheduler == "scheduler-alpha"
 
+    def test_scheduler_property_raises_when_none(
+        self, handler_module: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        handler = self._make_handler(handler_module, monkeypatch)
+        node = SimpleNamespace(scheduler=None)
+        handler.storage["alpha"] = node
+        handler.default_alias_name = "alpha"
+        handler._ready = True
+        with pytest.raises(ValueError, match="Scheduler for alias alpha not found"):
+            _ = handler.scheduler
+
     def test_scheduler_triggers_ready(
         self, handler_module: ModuleType, monkeypatch: pytest.MonkeyPatch
     ) -> None:

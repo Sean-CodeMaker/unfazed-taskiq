@@ -67,7 +67,12 @@ class AgentHandler(Storage[TaskiqAgent]):
     @property
     def scheduler(self) -> UnfazedTaskiqScheduler:
         """Get the default scheduler"""
-        return self.storage[self.default_alias_name].scheduler
+        _s: Optional[UnfazedTaskiqScheduler] = self.storage[
+            self.default_alias_name
+        ].scheduler
+        if _s is None:
+            raise ValueError(f"Scheduler for alias {self.default_alias_name} not found")
+        return _s
 
     @property
     def broker(self) -> AsyncBroker:

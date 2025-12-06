@@ -6,6 +6,7 @@ from taskiq import ScheduledTask, ScheduleSource
 from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.utils import maybe_awaitable
 from tortoise import BaseDBAsyncClient, Tortoise
+from tortoise.exceptions import IntegrityError
 from tortoise.expressions import F
 from unfazed.conf import UnfazedSettings, settings
 from unfazed.utils import import_string
@@ -19,8 +20,8 @@ class TortoiseScheduleSource(ScheduleSource):
         self,
         db_alias: str = "default",
         schedule_alias: str = "default",
-        startup_handlers: t.List[str] = [],
-        shutdown_handlers: t.List[str] = [],
+        startup_handlers: t.Optional[t.List[str]] = None,
+        shutdown_handlers: t.Optional[t.List[str]] = None,
         serializer: t.Optional[TaskiqSerializer] = None,
     ) -> None:
         """
@@ -42,8 +43,8 @@ class TortoiseScheduleSource(ScheduleSource):
         self._alias: str = db_alias
         self.alias: t.Optional[BaseDBAsyncClient] = None
         self.schedule_alias: str = schedule_alias
-        self.startup_handlers: t.List[str] = startup_handlers
-        self.shutdown_handlers: t.List[str] = shutdown_handlers
+        self.startup_handlers: t.List[str] = startup_handlers or []
+        self.shutdown_handlers: t.List[str] = shutdown_handlers or []
 
     async def startup(self) -> None:
         """Action to execute during startup."""
@@ -111,13 +112,6 @@ class TortoiseScheduleSource(ScheduleSource):
 
         schedule_id = schedule.schedule_id
 
-        if (
-            await m.PeriodicTask.filter(schedule_id=schedule_id)
-            .using_db(self.alias)
-            .exists()
-        ):
-            raise RuntimeError(f"Schedule {schedule_id} already exists")
-
         pt = m.PeriodicTask(
             task_name=schedule.task_name,
             task_args=json.dumps(schedule.args).decode(),
@@ -136,7 +130,10 @@ class TortoiseScheduleSource(ScheduleSource):
         else:
             raise RuntimeError("No schedule found")
 
-        await pt.save(using_db=self.alias)
+        try:
+            await pt.save(using_db=self.alias)
+        except IntegrityError:
+            raise RuntimeError(f"Schedule {schedule_id} already exists")
 
     async def delete_schedule(self, schedule_id: str) -> None:
         """
