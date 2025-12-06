@@ -1,10 +1,11 @@
 import os
 from typing import Optional
 
-from taskiq import AsyncBroker, TaskiqScheduler
+from taskiq import AsyncBroker
 from unfazed.utils import Storage, import_setting
 
 from unfazed_taskiq.agent.model import TaskiqAgent
+from unfazed_taskiq.contrib.scheduler.scheduler import UnfazedTaskiqScheduler
 from unfazed_taskiq.settings import UnfazedTaskiqSettings
 
 
@@ -64,7 +65,7 @@ class AgentHandler(Storage[TaskiqAgent]):
         return self.storage.get(_alias_name, None)
 
     @property
-    def scheduler(self) -> TaskiqScheduler:
+    def scheduler(self) -> UnfazedTaskiqScheduler:
         """Get the default scheduler"""
         return self.storage[self.default_alias_name].scheduler
 

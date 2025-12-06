@@ -76,6 +76,16 @@ class TortoiseScheduleSource(ScheduleSource):
         ).using_db(self.alias)
         return [schedule.to_taskiq_schedule_task() for schedule in schedules]
 
+    async def get_schedule_by_id(self, schedule_id: str) -> t.Optional["ScheduledTask"]:
+        schedule: t.Optional[m.PeriodicTask] = (
+            await m.PeriodicTask.filter(schedule_id=schedule_id, enabled=1)
+            .using_db(self.alias)
+            .first()
+        )
+        if schedule is None:
+            return None
+        return schedule.to_taskiq_schedule_task()
+
     async def add_schedule(
         self,
         schedule: "ScheduledTask",

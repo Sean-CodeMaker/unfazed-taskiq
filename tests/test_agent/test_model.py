@@ -8,7 +8,6 @@ from taskiq import (
     AsyncBroker,
     ScheduleSource,
     TaskiqEvents,
-    TaskiqScheduler,
 )
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
@@ -17,6 +16,7 @@ from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
 
 from unfazed_taskiq.agent.model import TaskiqAgent
+from unfazed_taskiq.contrib.scheduler.scheduler import UnfazedTaskiqScheduler
 from unfazed_taskiq.settings import Broker, Result, Scheduler, TaskiqConfig
 
 
@@ -115,13 +115,14 @@ class TestTaskiqAgent:
             def __call__(self, state: TaskiqState) -> None:
                 state.custom["called"] = True  # type: ignore[attr-defined]
 
-        class SchedulerBackend(TaskiqScheduler):
+        class SchedulerBackend(UnfazedTaskiqScheduler):
             def __init__(
                 self, broker: AsyncBroker, sources: Sequence[ScheduleSource]
             ) -> None:
                 self.startup_mock: AsyncMock = AsyncMock()
                 self.shutdown_mock: AsyncMock = AsyncMock()
                 self.run_mock: AsyncMock = AsyncMock()
+                self.trigger_by_schedule_id_mock: AsyncMock = AsyncMock()
                 super().__init__(broker, list(sources))
 
             async def add_task(self, task: Callable[..., Awaitable[None]]) -> None:
@@ -129,6 +130,9 @@ class TestTaskiqAgent:
 
             async def remove_task(self, task: Callable[..., Awaitable[None]]) -> None:
                 self.run_mock(task)
+
+            async def trigger_by_schedule_id(self, schedule_id: str) -> None:
+                await self.trigger_by_schedule_id_mock(schedule_id)
 
             async def run(self) -> SchedulerResult:
                 await self.run_mock()
@@ -197,7 +201,7 @@ class TestTaskiqAgent:
         assert middleware_names == ["MiddlewareA", "MiddlewareB"]
         assert broker.event_handlers[TaskiqEvents.WORKER_STARTUP]
         assert broker.event_handlers[TaskiqEvents.CLIENT_STARTUP]
-        scheduler: TaskiqScheduler = agent.scheduler  # type: ignore
+        scheduler: UnfazedTaskiqScheduler = agent.scheduler  # type: ignore
         assert isinstance(scheduler, self.fake_classes["scheduler"])
         assert scheduler.broker is broker
         assert len(scheduler.sources) == 2

@@ -129,7 +129,7 @@ UNFAZED_TASKIQ_SETTINGS = {
             },
             "SCHEDULER": {
                 "SOURCES": [unfazedtaskiq_source],
-                "BACKEND": "taskiq.TaskiqScheduler",
+                "BACKEND": "unfazed_taskiq.UnfazedTaskiqScheduler",
             },
         },
         "taskiq_task": {
@@ -146,7 +146,7 @@ UNFAZED_TASKIQ_SETTINGS = {
             },
             "SCHEDULER": {
                 "SOURCES": [unfazedtaskiq_v2_source],
-                "BACKEND": "taskiq.TaskiqScheduler",
+                "BACKEND": "unfazed_taskiq.UnfazedTaskiqScheduler",
             },
         },
     },

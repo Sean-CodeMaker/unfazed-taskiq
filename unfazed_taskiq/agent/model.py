@@ -1,9 +1,10 @@
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
-from taskiq import AsyncBroker, ScheduleSource, TaskiqEvents, TaskiqScheduler
+from taskiq import AsyncBroker, ScheduleSource, TaskiqEvents
 from unfazed.utils import import_string
 
+from unfazed_taskiq.contrib.scheduler.scheduler import UnfazedTaskiqScheduler
 from unfazed_taskiq.settings import TaskiqConfig
 
 
@@ -11,7 +12,7 @@ class TaskiqAgent(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     alias_name: str
     broker: AsyncBroker
-    scheduler: Optional[TaskiqScheduler]
+    scheduler: Optional[UnfazedTaskiqScheduler]
     config: TaskiqConfig
 
     @classmethod
@@ -45,7 +46,7 @@ class TaskiqAgent(BaseModel):
         # setup scheduler
         scheduler = None
         if config.scheduler:
-            scheduler_cls: type[TaskiqScheduler] = import_string(
+            scheduler_cls: type[UnfazedTaskiqScheduler] = import_string(
                 config.scheduler.backend
             )
             scheduler_sources = config.scheduler.sources or []
@@ -63,7 +64,11 @@ class TaskiqAgent(BaseModel):
         )
 
     async def startup(self) -> None:
-        if self.scheduler and isinstance(self.scheduler, TaskiqScheduler):
+        if (
+            self.scheduler
+            and isinstance(self.scheduler, type)
+            and issubclass(self.scheduler, UnfazedTaskiqScheduler)
+        ):
             await self.scheduler.startup()
             if self.scheduler.sources:
                 for source in self.scheduler.sources:
@@ -71,7 +76,11 @@ class TaskiqAgent(BaseModel):
         await self.broker.startup()
 
     async def shutdown(self) -> None:
-        if self.scheduler and isinstance(self.scheduler, TaskiqScheduler):
+        if (
+            self.scheduler
+            and isinstance(self.scheduler, type)
+            and issubclass(self.scheduler, UnfazedTaskiqScheduler)
+        ):
             await self.scheduler.shutdown()
             if self.scheduler.sources:
                 for source in self.scheduler.sources:

@@ -1,4 +1,5 @@
 import uuid
+from enum import IntEnum
 
 import orjson as json
 from taskiq import ScheduledTask
@@ -17,6 +18,10 @@ class BaseModel(models.Model):
 class PeriodicTask(BaseModel):
     class Meta:
         table = "unfazed_taskiq_periodic_task"
+
+    class EnabledEnum(IntEnum):
+        ENABLED = 1
+        DISABLED = 0
 
     schedule_alias = fields.CharField(
         max_length=255,
@@ -75,8 +80,9 @@ class PeriodicTask(BaseModel):
         description="The total number of times the task has been run.",
     )
 
-    enabled = fields.SmallIntField(
-        default=1,
+    enabled = fields.IntEnumField(
+        enum_type=EnabledEnum,
+        default=EnabledEnum.DISABLED.value,
         description="Whether the task is enabled.",
     )
 

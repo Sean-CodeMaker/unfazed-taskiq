@@ -4,14 +4,15 @@ from typing import List, Optional, Sequence, Union
 
 from taskiq.cli.common_args import LogLevel
 from taskiq.cli.scheduler.args import SchedulerArgs
-from taskiq.scheduler.scheduler import TaskiqScheduler
+
+from unfazed_taskiq.contrib.scheduler.scheduler import UnfazedTaskiqScheduler
 
 
 @dataclass
 class SchedulerEventArgs(SchedulerArgs):
     """Arguments for scheduler."""
 
-    scheduler: Union[str, TaskiqScheduler]
+    scheduler: Union[str, UnfazedTaskiqScheduler]
     modules: List[str]
     log_level: str = LogLevel.INFO.name
     configure_logging: bool = True
