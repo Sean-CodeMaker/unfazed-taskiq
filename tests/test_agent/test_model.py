@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Awaitable, Callable, Iterable, List, Sequence
+from typing import Any, Awaitable, Callable, Iterable, List
 from unittest.mock import AsyncMock
 
 import pytest
@@ -117,13 +117,13 @@ class TestTaskiqAgent:
 
         class SchedulerBackend(UnfazedTaskiqScheduler):
             def __init__(
-                self, broker: AsyncBroker, sources: Sequence[ScheduleSource]
+                self, broker: AsyncBroker, sources: List[ScheduleSource]
             ) -> None:
                 self.startup_mock: AsyncMock = AsyncMock()
                 self.shutdown_mock: AsyncMock = AsyncMock()
                 self.run_mock: AsyncMock = AsyncMock()
                 self.trigger_by_schedule_id_mock: AsyncMock = AsyncMock()
-                super().__init__(broker, list(sources))
+                super().__init__(broker, sources)
 
             async def add_task(self, task: Callable[..., Awaitable[None]]) -> None:
                 self.run_mock(task)

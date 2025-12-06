@@ -64,11 +64,7 @@ class TaskiqAgent(BaseModel):
         )
 
     async def startup(self) -> None:
-        if (
-            self.scheduler
-            and isinstance(self.scheduler, type)
-            and issubclass(self.scheduler, UnfazedTaskiqScheduler)
-        ):
+        if self.scheduler is not None:
             await self.scheduler.startup()
             if self.scheduler.sources:
                 for source in self.scheduler.sources:
@@ -76,11 +72,7 @@ class TaskiqAgent(BaseModel):
         await self.broker.startup()
 
     async def shutdown(self) -> None:
-        if (
-            self.scheduler
-            and isinstance(self.scheduler, type)
-            and issubclass(self.scheduler, UnfazedTaskiqScheduler)
-        ):
+        if self.scheduler is not None:
             await self.scheduler.shutdown()
             if self.scheduler.sources:
                 for source in self.scheduler.sources:

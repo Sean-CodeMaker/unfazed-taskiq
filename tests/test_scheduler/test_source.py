@@ -2,11 +2,14 @@ import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from taskiq import ScheduledTask
 from tortoise import Tortoise
 
 from unfazed_taskiq.contrib.scheduler.models import PeriodicTask
+from unfazed_taskiq.contrib.scheduler.scheduler import UnfazedTaskiqScheduler
 from unfazed_taskiq.contrib.scheduler.sources import TortoiseScheduleSource
 
 
@@ -119,6 +122,53 @@ class TestTortoiseScheduleSource(object):
         assert schedules[0].kwargs == json.loads(simple_data[0]["task_kwargs"])
         assert schedules[0].labels == json.loads(simple_data[0]["labels"])
         assert schedules[0].schedule_id == simple_data[0]["schedule_id"]
+
+    async def test_tortoise_schedule_source_get_schedule_by_id(
+        self, test_scheduler_sample_data: list[dict]
+    ) -> None:
+        """Test TortoiseScheduleSource get_schedule_by_id returns schedule when found."""
+        source = TortoiseScheduleSource(schedule_alias="test_schedule3")
+        await source.startup()
+
+        # Get enabled schedule (test_schedule3 has enabled=1)
+        result_scheduler = list(
+            filter(
+                lambda x: x["schedule_alias"] == "test_schedule3",
+                test_scheduler_sample_data,
+            )
+        )
+        schedule = await source.get_schedule_by_id(result_scheduler[0]["schedule_id"])
+        assert schedule is not None
+        assert schedule.task_name == result_scheduler[0]["task_name"]
+        assert schedule.schedule_id == result_scheduler[0]["schedule_id"]
+
+    async def test_tortoise_schedule_source_get_schedule_by_id_not_found(
+        self, test_scheduler_sample_data: list[dict]
+    ) -> None:
+        """Test TortoiseScheduleSource get_schedule_by_id returns None when not found."""
+        source = TortoiseScheduleSource(schedule_alias="test_schedule3")
+        await source.startup()
+
+        # Test with non-existent schedule_id
+        schedule = await source.get_schedule_by_id("non_existent_schedule_id")
+        assert schedule is None
+
+    async def test_tortoise_schedule_source_get_schedule_by_id_disabled(
+        self, test_scheduler_sample_data: list[dict]
+    ) -> None:
+        """Test TortoiseScheduleSource get_schedule_by_id returns None for disabled schedules."""
+        source = TortoiseScheduleSource(schedule_alias="test_schedule1")
+        await source.startup()
+
+        # test_schedule1 has enabled=0
+        result_scheduler = list(
+            filter(
+                lambda x: x["schedule_alias"] == "test_schedule1",
+                test_scheduler_sample_data,
+            )
+        )
+        schedule = await source.get_schedule_by_id(result_scheduler[0]["schedule_id"])
+        assert schedule is None
 
     async def test_tortoise_schedule_source_add_schedule(
         self, test_scheduler_sample_data: list[dict]
@@ -425,3 +475,132 @@ class TestTortoiseScheduleSourceErrors(object):
 
         with pytest.raises(RuntimeError, match="No schedule found"):
             await source.add_schedule(mock_task)
+
+
+class TestUnfazedTaskiqScheduler:
+    """Test UnfazedTaskiqScheduler."""
+
+    async def test_trigger_by_schedule_id_success(
+        self, test_scheduler_sample_data: list[dict]
+    ) -> None:
+        """Test trigger_by_schedule_id successfully triggers a schedule."""
+        # Create a mock broker
+        mock_broker = MagicMock()
+        mock_broker.startup = AsyncMock()
+        mock_broker.shutdown = AsyncMock()
+
+        # Create source and startup
+        source = TortoiseScheduleSource(schedule_alias="test_schedule3")
+        await source.startup()
+
+        # Create scheduler
+        scheduler = UnfazedTaskiqScheduler(broker=mock_broker, sources=[source])
+
+        # Mock on_ready to verify it's called
+        scheduler.on_ready = AsyncMock()  # type: ignore
+
+        # Get enabled schedule (test_schedule3 has enabled=1)
+        result_scheduler = list(
+            filter(
+                lambda x: x["schedule_alias"] == "test_schedule3",
+                test_scheduler_sample_data,
+            )
+        )
+        schedule_id = result_scheduler[0]["schedule_id"]
+
+        # Trigger the schedule
+        await scheduler.trigger_by_schedule_id(schedule_id)
+
+        # Verify on_ready was called
+        scheduler.on_ready.assert_awaited_once()
+        call_args = scheduler.on_ready.call_args
+        assert call_args[0][0] is source
+        assert call_args[0][1].schedule_id == schedule_id
+
+    async def test_trigger_by_schedule_id_not_found(
+        self, test_scheduler_sample_data: list[dict]
+    ) -> None:
+        """Test trigger_by_schedule_id raises ValueError when schedule not found."""
+        # Create a mock broker
+        mock_broker = MagicMock()
+
+        # Create source and startup
+        source = TortoiseScheduleSource(schedule_alias="test_schedule3")
+        await source.startup()
+
+        # Create scheduler
+        scheduler = UnfazedTaskiqScheduler(broker=mock_broker, sources=[source])
+
+        # Try to trigger non-existent schedule
+        with pytest.raises(ValueError, match="Schedule non_existent_id not found"):
+            await scheduler.trigger_by_schedule_id("non_existent_id")
+
+    async def test_trigger_by_schedule_id_skips_non_tortoise_source(
+        self, test_scheduler_sample_data: list[dict]
+    ) -> None:
+        """Test trigger_by_schedule_id skips non-TortoiseScheduleSource sources."""
+        from taskiq import ScheduleSource
+
+        # Create a mock broker
+        mock_broker = MagicMock()
+
+        # Create a non-TortoiseScheduleSource
+        class FakeSource(ScheduleSource):
+            async def get_schedules(self) -> list:
+                return []
+
+        fake_source = FakeSource()
+
+        # Create TortoiseScheduleSource and startup
+        tortoise_source = TortoiseScheduleSource(schedule_alias="test_schedule3")
+        await tortoise_source.startup()
+
+        # Create scheduler with both sources
+        scheduler = UnfazedTaskiqScheduler(
+            broker=mock_broker, sources=[fake_source, tortoise_source]
+        )
+        scheduler.on_ready = AsyncMock()  # type: ignore
+
+        # Get enabled schedule
+        result_scheduler = list(
+            filter(
+                lambda x: x["schedule_alias"] == "test_schedule3",
+                test_scheduler_sample_data,
+            )
+        )
+        schedule_id = result_scheduler[0]["schedule_id"]
+
+        # Trigger the schedule - should skip FakeSource and use TortoiseScheduleSource
+        await scheduler.trigger_by_schedule_id(schedule_id)
+
+        # Verify on_ready was called with tortoise_source
+        scheduler.on_ready.assert_awaited_once()
+        call_args = scheduler.on_ready.call_args
+        assert call_args[0][0] is tortoise_source
+
+    async def test_trigger_by_schedule_id_disabled_schedule(
+        self, test_scheduler_sample_data: list[dict]
+    ) -> None:
+        """Test trigger_by_schedule_id raises ValueError for disabled schedules."""
+        # Create a mock broker
+        mock_broker = MagicMock()
+
+        # Create source for test_schedule1 (which has enabled=0)
+        source = TortoiseScheduleSource(schedule_alias="test_schedule1")
+        await source.startup()
+
+        # Create scheduler
+        scheduler = UnfazedTaskiqScheduler(broker=mock_broker, sources=[source])
+
+        # Get disabled schedule (test_schedule1 has enabled=0)
+        result_scheduler = list(
+            filter(
+                lambda x: x["schedule_alias"] == "test_schedule1",
+                test_scheduler_sample_data,
+            )
+        )
+        schedule_id = result_scheduler[0]["schedule_id"]
+
+        # Try to trigger disabled schedule - should raise ValueError
+        with pytest.raises(ValueError, match=f"Schedule {schedule_id} not found"):
+            await scheduler.trigger_by_schedule_id(schedule_id)

@@ -72,13 +72,17 @@ class TortoiseScheduleSource(ScheduleSource):
         """Get list of taskiq schedules."""
 
         schedules = await m.PeriodicTask.filter(
-            enabled=1, schedule_alias=self.schedule_alias
+            enabled=m.PeriodicTask.EnabledEnum.ENABLED.value,
+            schedule_alias=self.schedule_alias,
         ).using_db(self.alias)
         return [schedule.to_taskiq_schedule_task() for schedule in schedules]
 
     async def get_schedule_by_id(self, schedule_id: str) -> t.Optional["ScheduledTask"]:
         schedule: t.Optional[m.PeriodicTask] = (
-            await m.PeriodicTask.filter(schedule_id=schedule_id, enabled=1)
+            await m.PeriodicTask.filter(
+                schedule_id=schedule_id,
+                enabled=m.PeriodicTask.EnabledEnum.ENABLED.value,
+            )
             .using_db(self.alias)
             .first()
         )
@@ -121,6 +125,7 @@ class TortoiseScheduleSource(ScheduleSource):
             labels=json.dumps(schedule.labels).decode(),
             schedule_id=schedule_id,
             schedule_alias=self.schedule_alias,
+            enabled=m.PeriodicTask.EnabledEnum.ENABLED.value,
             time=datetime.now(),
         )
 
@@ -145,7 +150,7 @@ class TortoiseScheduleSource(ScheduleSource):
         await (
             m.PeriodicTask.filter(schedule_id=schedule_id)
             .using_db(self.alias)
-            .update(enabled=0)
+            .update(enabled=m.PeriodicTask.EnabledEnum.DISABLED.value)
         )
 
     async def pre_send(  # type: ignore
@@ -178,9 +183,9 @@ class TortoiseScheduleSource(ScheduleSource):
         :param task: task that just have sent
         """
 
-        enabled: int = 1
+        enabled: int = m.PeriodicTask.EnabledEnum.ENABLED.value
         if task.cron is None and task.time is not None:
-            enabled = 0
+            enabled = m.PeriodicTask.EnabledEnum.DISABLED.value
 
         await (
             m.PeriodicTask.filter(schedule_id=task.schedule_id)
