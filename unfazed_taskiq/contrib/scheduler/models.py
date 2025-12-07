@@ -3,16 +3,9 @@ from enum import IntEnum
 
 import orjson as json
 from taskiq import ScheduledTask
-from tortoise import fields, models
+from tortoise import fields
 
-
-class BaseModel(models.Model):
-    id = fields.IntField(pk=True)
-    updated_at = fields.DatetimeField(auto_now=True)
-    created_at = fields.DatetimeField(auto_now_add=True)
-
-    class Meta:
-        abstract = True
+from unfazed_taskiq.base_model import BaseModel
 
 
 class PeriodicTask(BaseModel):
