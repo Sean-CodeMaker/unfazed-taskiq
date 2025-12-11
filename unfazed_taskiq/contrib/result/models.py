@@ -8,10 +8,10 @@ class UnfazedTaskiqResult(BaseModel):
         table = "unfazed_taskiq_result"
 
     class ProcessStatusEnum(IntEnum):
-        PROCESSING = 0
+        STARTED = 0
         SUCCEEDED = 1
         FAILED = 2
-        CANCELLED = 3
+        RETRY = 3
 
     started_at = fields.IntField(
         description="The started timestamp of the task.",
@@ -27,7 +27,7 @@ class UnfazedTaskiqResult(BaseModel):
 
     process_status = fields.IntEnumField(
         enum_type=ProcessStatusEnum,
-        default=ProcessStatusEnum.PROCESSING.value,
+        default=ProcessStatusEnum.STARTED.value,
         description="The process status of the task.",
     )
     schedule_id = fields.CharField(
