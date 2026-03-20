@@ -41,5 +41,5 @@ class TaskiqConfig(BaseModel):
 class UnfazedTaskiqSettings(BaseModel):
     taskiq_config: t.Dict[str, TaskiqConfig] = Field(alias="TASKIQ_CONFIG")
     default_alias_name: t.Optional[str] = Field(
-        alias="DEFAULT_ALIAS_NAME", default="default"
+        alias="DEFAULT_TASKIQ_NAME", default="default"
     )
