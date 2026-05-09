@@ -215,6 +215,84 @@ Start the Taskiq worker to process tasks:
 uv run taskiq unfazed-worker unfazed_taskiq.agent:broker -fsd -tp app/tasks.py
 ```
 
+## Result backend
+
+**Result backend** is where this library **stores Taskiq task results** (MySQL/TiDB via `MySQLResultBackend`): each task gets a row with status, times, args/kwargs, and return value; the full serialized payload is kept in the `result` column.
+
+**Unfazed Admin**: add `unfazed_taskiq.contrib.result` to `INSTALLED_APPS`. It registers **`TaskiqResultAdmin`** with **`TaskiqResultSerializer`**, so you can **browse and open task runs in the admin UI** (list + detail, including a readable `return_value` field). The raw binary `result` field is not exposed as JSON in admin APIs.
+
+### 1. How to enable
+
+Add the app under `UNFAZED_SETTINGS["INSTALLED_APPS"]`, and add the middleware + result backend under `TASKIQ_CONFIG` for your Taskiq instance name (same place as broker/scheduler):
+
+```python
+UNFAZED_SETTINGS = {
+    # ...
+    "INSTALLED_APPS": [
+        # ...your apps...
+        "unfazed_taskiq.contrib.result",
+    ],
+}
+
+UNFAZED_TASKIQ_SETTINGS = {
+    "TASKIQ_CONFIG": {
+        "your_taskiq_name": {  # e.g. DEFAULT_TASKIQ_NAME
+            "BROKER": {
+                # ...broker BACKEND / OPTIONS...
+                "MIDDLEWARES": [
+                    "unfazed_taskiq.contrib.result.middleware.TaskiqResultPreSendMiddleware",
+                ],
+            },
+            "RESULT": {
+                "BACKEND": "unfazed_taskiq.contrib.result.mysql.MySQLResultBackend",
+                "OPTIONS": {},
+            },
+            # ...SCHEDULER, etc...
+        },
+    },
+}
+```
+### 2. Create table
+
+``` SQL
+CREATE TABLE `taskiq_result` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `task_id` VARCHAR(255) NOT NULL UNIQUE
+        COMMENT 'Task unique identifier',
+    `status` SMALLINT NOT NULL
+        COMMENT 'TaskStatus: 1=STARTED, 2=SUCCESS, 3=FAILURE',
+    `result` BLOB NULL
+        COMMENT 'Serialized TaskiqResult from serializer.dumpb',
+    `return_value` JSON NULL
+        COMMENT 'Snapshot via encode_for_json_field; full value in result blob',
+    `date_done` BIGINT NULL
+        COMMENT 'Timestamp when task completed',
+    `date_created` BIGINT NULL
+        COMMENT 'Timestamp when task was enqueued',
+    `task_name` VARCHAR(255) NULL
+        COMMENT 'Task definition name',
+    `schedule_id` VARCHAR(255) NULL
+        COMMENT 'Schedule id for periodic tasks (from labels)',
+    `task_args` JSON NULL
+        COMMENT 'JSON array or __taskiq_json_str_fallback__ str(list)',
+    `task_kwargs` JSON NULL
+        COMMENT 'JSON object or __taskiq_json_str_fallback__ str(dict)',
+    `traceback` TEXT NULL
+        COMMENT 'Traceback when task failed',
+    INDEX `idx_date_done` (`date_done`),
+    INDEX `idx_task_name_date_done` (`task_name`, `date_done`),
+    INDEX `idx_schedule_id_date_done` (`schedule_id`, `date_done`),
+    INDEX `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 3. How to get the result
+
+```python
+task = await add_numbers.kiq(10, 20)
+value = await task.wait_result()  # waits until done, then returns the value
+```
+
 ## 📖 更多文档
 
 pls read [taskiq document](https://taskiq-python.github.io/guide/)
