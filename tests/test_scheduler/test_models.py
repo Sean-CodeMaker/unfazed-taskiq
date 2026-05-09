@@ -118,3 +118,70 @@ class TestPeriodicTaskSerializer(object):
         )
         assert result is not None
         assert len(result.data) == 2
+
+    async def test_validator_accepts_valid_json_strings(self) -> None:
+        """Test that validator accepts valid JSON strings for task_kwargs, task_args, and labels."""
+        valid_data = {
+            "task_name": "test.task",
+            "task_kwargs": '{"key": "value"}',
+            "task_args": '["arg1", "arg2"]',
+            "labels": '{"label1": "value1"}',
+        }
+        # Use model_validate to trigger the validator
+        serializer = PeriodicTaskSerializer.model_validate(valid_data)
+        assert serializer.task_name == valid_data["task_name"]
+        assert serializer.task_kwargs == valid_data["task_kwargs"]
+        assert serializer.task_args == valid_data["task_args"]
+        assert serializer.labels == valid_data["labels"]
+
+    async def test_validator_accepts_none_json_fields(self) -> None:
+        """Test that validator accepts None values for JSON fields (skips validation)."""
+        data_with_none_fields = {
+            "task_name": "test.task",
+            "task_args": "[]",
+            "task_kwargs": "{}",
+            "labels": "{}",
+        }
+        # Use model_validate to trigger the validator - should not raise
+        serializer = PeriodicTaskSerializer.model_validate(data_with_none_fields)
+        assert serializer.task_name == data_with_none_fields["task_name"]
+
+    async def test_validator_rejects_invalid_task_kwargs(self) -> None:
+        """Test that validator rejects invalid JSON in task_kwargs."""
+        import pytest
+        from pydantic import ValidationError
+
+        invalid_data = {
+            "task_name": "test.task",
+            "task_kwargs": "{invalid}",
+        }
+        with pytest.raises(
+            ValidationError, match="task_kwargs is not a valid JSON string"
+        ):
+            PeriodicTaskSerializer.model_validate(invalid_data)
+
+    async def test_validator_rejects_invalid_task_args(self) -> None:
+        """Test that validator rejects invalid JSON in task_args."""
+        import pytest
+        from pydantic import ValidationError
+
+        invalid_data = {
+            "task_name": "test.task",
+            "task_args": "{invalid}",
+        }
+        with pytest.raises(
+            ValidationError, match="task_args is not a valid JSON string"
+        ):
+            PeriodicTaskSerializer.model_validate(invalid_data)
+
+    async def test_validator_rejects_invalid_labels(self) -> None:
+        """Test that validator rejects invalid JSON in labels."""
+        import pytest
+        from pydantic import ValidationError
+
+        invalid_data = {
+            "task_name": "test.task",
+            "labels": "{invalid}",
+        }
+        with pytest.raises(ValidationError, match="labels is not a valid JSON string"):
+            PeriodicTaskSerializer.model_validate(invalid_data)
