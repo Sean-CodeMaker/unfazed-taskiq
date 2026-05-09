@@ -39,13 +39,13 @@ class AgentHandler(Storage[TaskiqAgent]):
 
         # extract broker settings
         taskiq_settings = settings_kv["UNFAZED_TASKIQ_SETTINGS"]
-        self.default_alias_name = taskiq_settings.get("DEFAULT_TASKIQ_NAME", "default")
         try:
             taskiq_config_settings = UnfazedTaskiqSettings.model_validate(
                 taskiq_settings
             )
         except Exception as e:
             raise ValueError(f"Invalid settings configuration: {e}")
+        self.default_alias_name = taskiq_config_settings.default_alias_name or "default"
 
         for alias_name, taskiq_config in taskiq_config_settings.taskiq_config.items():
             taskiq_agent: TaskiqAgent = TaskiqAgent.setup(alias_name, taskiq_config)
